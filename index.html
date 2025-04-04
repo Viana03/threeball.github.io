@@ -54,10 +54,13 @@
             `;
             document.body.appendChild(instructionsDiv2);
 
+            // Variável de pontuação
+            let score = 0;
+
             // Configuração básica
             const scene = new THREE.Scene();
             const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 12, 7);
+            camera.position.set(0, 13, 8);
 
             const renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -84,23 +87,24 @@
 
 
             // Luzes
-            const spotLight1 = new THREE.SpotLight(0xffffff, Math.PI * 25);
-            spotLight1.position.set(2.5, 5, 5);
+            const spotLight1 = new THREE.SpotLight(0xffffff, 100);
+            spotLight1.position.set(5, 8, 8);
             spotLight1.angle = Math.PI / 4;
             spotLight1.penumbra = 0.5;
             spotLight1.castShadow = true;
             scene.add(spotLight1);
 
-            const spotLight2 = new THREE.SpotLight(0xffffff, Math.PI * 25);
-            spotLight2.position.set(-2.5, 5, 5);
+            const spotLight2 = new THREE.SpotLight(0xffffff, 100);
+            spotLight2.position.set(-5, 8, 8);
             spotLight2.angle = Math.PI / 4;
             spotLight2.penumbra = 0.5;
             spotLight2.castShadow = true;
             scene.add(spotLight2);
 
+
             // Física
             const world = new CANNON.World({
-                gravity: new CANNON.Vec3(0, -9.8, 3)
+                gravity: new CANNON.Vec3(0, -9.8, 4)
             });
 
             // Materiais
@@ -194,42 +198,48 @@
             }
 
             // Criar paredes
-            createWall(0.25, 1, 4, new THREE.Vector3(-3.4, 0.5, -0.1), { x: 0, y: Math.PI / 8, z: 0 });
-            createWall(0.25, 1, 4, new THREE.Vector3(3.4, 0.5, -0.1), { x: 0, y: -Math.PI / 8, z: 0 });
-            createWall(0.25, 1, 14, new THREE.Vector3(4.3, 0.5, -1), { x: 0, y: 0, z: 0 });
-            createWall(0.5, 1, 16, new THREE.Vector3(-4.17, 0.5, -2), { x: 0, y: 0, z: 0 });
-            createWall(0.5, 1, 16, new THREE.Vector3(5.9, 0.5, -2), { x: 0, y: 0, z: 0 });
+            createWall(0.5, 1, 17, new THREE.Vector3(-6, 0.5, -2), { x: 0, y: 0, z: 0 });
+            createWall(0.5, 1, 17, new THREE.Vector3(6, 0.5, -2), { x: 0, y: 0, z: 0 });
+            createWall(0.25, 1, 15, new THREE.Vector3(4.5, 0.5, -1), { x: 0, y: 0, z: 0 });
+            createWall(0.25, 1, 2, new THREE.Vector3(-4.5, 0.5, 2), { x: 0, y: 0, z: 0 });
+            createWall(0.25, 1, 2, new THREE.Vector3(3, 0.5, 2), { x: 0, y: 0, z: 0 });
+            createWall(0.25, 1, 2, new THREE.Vector3(-4.1, 0.5, 3.9), { x: 0, y: Math.PI / 8, z: 0 });
+            createWall(0.25, 1, 2, new THREE.Vector3(2.6, 0.5, 3.9), { x: 0, y: -Math.PI / 8, z: 0 });
+
 
             // Criar parede redonda
             function createCurvedWall(start, end, radius, height, segments) {
-                // Visual representation
+                // Visual
                 const curve = new THREE.QuadraticBezierCurve3(
-                    new THREE.Vector3(start.x, start.y, start.z), // Start point
-                    new THREE.Vector3(0, start.y, start.z - radius), // Control point (center of the curve)
-                    new THREE.Vector3(end.x, end.y, end.z) // End point
+                    start,
+                    new THREE.Vector3(0, start.y, start.z - radius),
+                    end
                 );
 
-                const tubeGeometry = new THREE.TubeGeometry(curve, segments, 0.5, 8, false);
+                const tubeGeometry = new THREE.TubeGeometry(curve, segments, 0.5, 32, false);
                 const tubeMaterial = new THREE.MeshNormalMaterial({ color: 0x0088ff });
                 const tubeMesh = new THREE.Mesh(tubeGeometry, tubeMaterial);
                 tubeMesh.castShadow = true;
                 scene.add(tubeMesh);
 
-                // Physics approximation
-                for (let i = 0; i < segments; i++) {
-                    const t1 = i / segments;
-                    const t2 = (i + 1) / segments;
+                // Física
+                const physicsSeg = segments * 2;
+                const segmentBodies = [];
+
+                for (let i = 0; i < physicsSeg; i++) {
+                    const t1 = i / physicsSeg;
+                    const t2 = (i + 1) / physicsSeg;
 
                     const point1 = curve.getPoint(t1);
                     const point2 = curve.getPoint(t2);
 
                     const midPoint = point1.clone().lerp(point2, 0.5);
+                    const direction = new THREE.Vector3().subVectors(point2, point1).normalize();
                     const segmentLength = point1.distanceTo(point2);
-
                     const segmentShape = new CANNON.Box(new CANNON.Vec3(
-                        segmentLength / 2 + 0.1,
+                        segmentLength / 2,
                         height / 2,
-                        0.3
+                        0.1
                     ));
 
                     const segmentBody = new CANNON.Body({
@@ -239,16 +249,27 @@
                     });
 
                     segmentBody.position.set(midPoint.x, midPoint.y + height / 2, midPoint.z);
-                    segmentBody.quaternion.setFromEuler(0, Math.atan2(point2.z - point1.z, point2.x - point1.x), 0);
+                    const angle = Math.atan2(direction.z, direction.x);
+                    segmentBody.quaternion.setFromEuler(0, angle, 0);
 
                     world.addBody(segmentBody);
+                    segmentBodies.push(segmentBody);
                 }
+
+                return { mesh: tubeMesh, bodies: segmentBodies };
             }
 
-            const start = new THREE.Vector3(-4.17, 0.5, -10);
-            const end = new THREE.Vector3(5.9, 0.5, -10);
+            const guideCurve = new THREE.QuadraticBezierCurve3(
+                new THREE.Vector3(-6, 0.5, -10.5),
+                new THREE.Vector3(0, 0.5, -5),
+                new THREE.Vector3(6, 0.5, -10.5)
+            );
 
-            createCurvedWall(start, end, 5, 0, 40);
+            const guideWall = createCurvedWall(
+                new THREE.Vector3(-6, 0.5, -10.5),
+                new THREE.Vector3(6, 0.5, -10.5),
+                4.5, 1, 30
+            );
 
             // Criar bumpers
             function createBumper(position) {
@@ -274,33 +295,41 @@
                 return { mesh: bumperMesh, body: bumperBody, scale: 1 };
             }
 
-            const bumper1 = createBumper(new THREE.Vector3(-2, 0.5, -4));
-            const bumper2 = createBumper(new THREE.Vector3(2, 0.5, -4));
+            const bumper1 = createBumper(new THREE.Vector3(-2.25, 0.5, -6));
+            const bumper2 = createBumper(new THREE.Vector3(0.5, 0.5, -7.5));
+            const bumper3 = createBumper(new THREE.Vector3(-0.75, 0.5, -4));
 
-            // Criar caixa deslizante
-            function createSlidingBox(args, position) {
+            // Criar plataforma circular
+            function createCircularPlatform(position) {
                 // Visual
-                const boxGeometry = new THREE.BoxGeometry(args[0], args[1], args[2]);
-                const boxMaterial = new THREE.MeshNormalMaterial();
-                const boxMesh = new THREE.Mesh(boxGeometry, boxMaterial);
-                boxMesh.position.copy(position);
-                boxMesh.castShadow = true;
-                scene.add(boxMesh);
+                const platformGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.1, 32);
+                const platformMaterial = new THREE.MeshNormalMaterial();
+                const platformMesh = new THREE.Mesh(platformGeometry, platformMaterial);
+                platformMesh.position.copy(position);
+                platformMesh.castShadow = true;
+                scene.add(platformMesh);
 
                 // Física
-                const boxShape = new CANNON.Box(new CANNON.Vec3(args[0] / 2, args[1] / 2, args[2] / 2));
-                const boxBody = new CANNON.Body({
+                const platformShape = new CANNON.Cylinder(0.5, 0.5, 0.05, 32);
+                const platformBody = new CANNON.Body({
                     mass: 0,
                     material: objectMaterial,
-                    shape: boxShape
+                    shape: platformShape,
+                    collisionResponse: false
                 });
-                boxBody.position.copy(position);
-                world.addBody(boxBody);
+                platformBody.isTrigger = true;
+                platformBody.userData = { isPlatform: true };
+                platformBody.position.copy(position);
+                world.addBody(platformBody);
 
-                return { mesh: boxMesh, body: boxBody, direction: 1, targetPosition: 0 };
+                return { 
+                    mesh: platformMesh, 
+                    body: platformBody,
+                    scale: 1,
+                    activated: false
+                };
             }
-
-            const slidingBox = createSlidingBox([1, 0.5, 0.1], new THREE.Vector3(0, 0.5, -1));
+            const circularPlatform = createCircularPlatform(new THREE.Vector3(-0.5, 0.5, -6));
 
             // Criar flippers
             function createFlipper(position, isLeft) {
@@ -310,10 +339,10 @@
                 const cylinderMesh = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
 
                 // Visual - parte que gira
-                const boxGeometry = new THREE.BoxGeometry(2, 0.65, 0.25);
+                const boxGeometry = new THREE.BoxGeometry(2., 0.65, 0.25);
                 const boxMaterial = new THREE.MeshNormalMaterial();
                 const boxMesh = new THREE.Mesh(boxGeometry, boxMaterial);
-                boxMesh.position.set(isLeft ? 1 : -1, 0, 0);
+                boxMesh.position.set(isLeft ? 1.25 : -1.25, 0, 0);
 
                 // Grupo para combinar as partes
                 const flipperGroup = new THREE.Group();
@@ -346,8 +375,8 @@
                 };
             }
 
-            const leftFlipper = createFlipper(new THREE.Vector3(-2.5, 0.5, 2), true);
-            const rightFlipper = createFlipper(new THREE.Vector3(2.5, 0.5, 2), false);
+            const leftFlipper = createFlipper(new THREE.Vector3(-3.6, 0.5, 5), true);
+            const rightFlipper = createFlipper(new THREE.Vector3(2.1, 0.5, 5), false);
 
             // Criar mola
             function createSpring(position) {
@@ -387,12 +416,10 @@
                     currentPosition: 1,
                     compressed: false,
                     released: false,
-                    attachedBall: null,
-                    connectionPoint: new CANNON.Vec3(position.x, position.y, position.z - 0.5),
                 };
             }
 
-            const spring = createSpring(new THREE.Vector3(5.1, 0.5, 0));
+            const spring = createSpring(new THREE.Vector3(5.15, 0.5, 0));
 
             // Criar bola
             function createBall(position) {
@@ -417,9 +444,20 @@
                 return { mesh: ballMesh, body: ballBody };
             }
 
-            const ball = createBall(new THREE.Vector3(5.1, 0.75, -1.3));
-            spring.attachedBall = ball;
-            //spring.connectionPoint.set(5.1, 1, -1.3)
+            const ball = createBall(new THREE.Vector3(spring.body.position.x, spring.body.position.y + 1, spring.body.position.z));
+
+            // Pontuação
+            const scoreDiv = document.createElement('div');
+            scoreDiv.id = 'score-display';
+            scoreDiv.style.position = 'absolute';
+            scoreDiv.style.top = '20px';
+            scoreDiv.style.left = '20px';
+            scoreDiv.style.color = 'white';
+            scoreDiv.style.fontFamily = 'Arial, sans-serif';
+            scoreDiv.style.fontSize = '24px';
+            scoreDiv.style.textShadow = '2px 2px 4px rgba(0,0,0,0.5)';
+            scoreDiv.textContent = `Score: ${score}`;
+            document.body.appendChild(scoreDiv);
 
             // Detectar colisões
             ball.body.addEventListener('collide', (event) => {
@@ -439,9 +477,26 @@
                     // Animar o bumper
                     if (otherBody === bumper1.body) {
                         bumper1.scale = 1.2;
+                        score += 100;
                     } else if (otherBody === bumper2.body) {
                         bumper2.scale = 1.2;
+                        score += 100;
+                    } else if (otherBody === bumper3.body) {
+                        bumper3.scale = 1.2;
+                        score += 100;
                     }
+
+                    scoreDiv.textContent = `Score: ${score}`;
+                }
+
+                if (otherBody === circularPlatform.body && !circularPlatform.activated) {
+                    circularPlatform.scale = 2.0;
+                    score += 500;
+                    scoreDiv.textContent = `Score: ${score}`;
+                    circularPlatform.activated = true;
+                    setTimeout(() => {
+                        circularPlatform.activated = false;
+                    }, 5000);
                 }
             });
 
@@ -474,12 +529,26 @@
                 ball.mesh.quaternion.copy(ball.body.quaternion);
 
                 // Verificar se a bola caiu
-                if (ball.body.position.z > 6 || ball.body.position.y < 0 || ball.body.position.y > 1.5) {
+                if (ball.body.position.z > 8 || ball.body.position.y < 0 || ball.body.position.y > 1.5) {
                     ball.body.velocity.set(0, 0, 0);
                     ball.body.angularVelocity.set(0, 0, 0);
-                    ball.body.position.set(5.1, 0.75, -1);
-                    spring.attachedBall = ball;
-                    spring.connectionPoint.set(5.1, 2.5, -1.3);
+                    ball.body.position.set(5.15, 0.5, -0.5);
+                }
+
+                if (ball.body.position.x >= 4.3 && ball.body.position.x <= 5.9 &&
+                    Math.abs(ball.body.position.z + 0.5) < 0.2) {
+
+                    // Verificar se não está já na posição inicial (com uma pequena tolerância)
+                    const isAtInitialPosition =
+                        Math.abs(ball.body.position.x - 5.15) < 0.1 &&
+                        Math.abs(ball.body.position.z + 0.5) < 0.1;
+
+                    // Só resetar se não estiver na posição inicial
+                    if (!isAtInitialPosition) {
+                        ball.body.velocity.set(0, 0, 0);
+                        ball.body.angularVelocity.set(0, 0, 0);
+                        ball.body.position.set(5.15, 0.5, -0.5);
+                    }
                 }
 
                 // Controlar flippers
@@ -511,21 +580,12 @@
                     spring.speed = dt * 5;
                     spring.compressed = true;
                     spring.released = false;
-                    if (spring.attachedBall) {
-                        //spring.connectionPoint.z = spring.currentPosition + 1;
-                        ball.body.position.copy(spring.connectionPoint);
-                        ball.body.velocity.set(0, 0, 0);
-                    }
+
                 } else if (spring.compressed) {
                     spring.targetPosition = 1;
                     spring.speed = dt * 15;
                     spring.compressed = false;
                     spring.released = true;
-                    if (spring.attachedBall) {
-                        const launchForce = 25 * (3 - spring.currentPosition);
-                        ball.body.velocity.set(0, 0, -launchForce);
-                        spring.attachedBall = null;
-                    }
                 } else {
                     spring.targetPosition = 1;
                     spring.speed = dt * 10;
@@ -534,14 +594,6 @@
 
                 spring.currentPosition = lerp(spring.currentPosition, spring.targetPosition, spring.speed);
                 spring.mesh.children[0].position.z = spring.currentPosition;
-
-                // Atualizar caixa deslizante
-                slidingBox.targetPosition += slidingBox.direction * dt;
-                if (slidingBox.targetPosition > 2) slidingBox.direction = -1;
-                if (slidingBox.targetPosition < -2) slidingBox.direction = 1;
-
-                slidingBox.mesh.position.x = lerp(slidingBox.mesh.position.x, slidingBox.targetPosition, 0.1);
-                slidingBox.body.position.x = slidingBox.mesh.position.x;
 
                 // Controlar a interação da mola com a bola
                 if (spring.released) {
@@ -565,7 +617,7 @@
                         direction.subVectors(ballPos, springPos).normalize();
 
                         // Aplicar impulso proporcional à compressão da mola
-                        const springForce = 25 * (spring.targetPosition - spring.currentPosition);
+                        const springForce = 50 * (spring.targetPosition - spring.currentPosition);
                         ball.body.velocity.set(
                             direction.x * springForce,
                             direction.y * springForce,
@@ -579,9 +631,15 @@
                 // Animar bumpers
                 bumper1.scale = lerp(bumper1.scale, 1, dt * 10);
                 bumper2.scale = lerp(bumper2.scale, 1, dt * 10);
+                bumper3.scale = lerp(bumper3.scale, 1, dt * 10);
 
                 bumper1.mesh.scale.set(bumper1.scale, 1, bumper1.scale);
                 bumper2.mesh.scale.set(bumper2.scale, 1, bumper2.scale);
+                bumper3.mesh.scale.set(bumper3.scale, 1, bumper3.scale);
+
+                // Animar plataforma circular
+                circularPlatform.scale = lerp(circularPlatform.scale, 1, dt * 10);
+                circularPlatform.mesh.scale.set(circularPlatform.scale, 1, circularPlatform.scale);
 
                 renderer.render(scene, camera);
             }

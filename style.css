@@ -61,3 +61,14 @@ kbd {
     transform: scale(1.05);
     box-shadow: 0 0 25px rgba(78, 205, 196, 0.8);
 }
+
+#score-display{
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: white;
+    font-family: monospace;
+    font-size: 1.5rem;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    z-index: 100;
+}
